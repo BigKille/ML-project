@@ -1,0 +1,141 @@
+import numpy as np
+import matplotlib.pyplot as plt
+from sklearn import datasets
+from sklearn.cluster import KMeans
+from sklearn_extra.cluster import KMedoids
+from sklearn.metrics import silhouette_score, adjusted_rand_score
+from sklearn.decomposition import PCA
+
+# ── Load data ──────────────────────────────────────────────────────────────────
+iris = datasets.load_iris()
+X = iris.data
+y = iris.target
+target_names = iris.target_names
+
+# ── Fit both models ────────────────────────────────────────────────────────────
+k = 3
+
+kmeans   = KMeans(n_clusters=k, random_state=0, n_init=10).fit(X)
+kmedoids = KMedoids(n_clusters=k, random_state=0).fit(X)
+
+labels_km  = kmeans.labels_
+labels_kmd = kmedoids.labels_
+
+# ── Metrics ────────────────────────────────────────────────────────────────────
+sil_km  = silhouette_score(X, labels_km)
+sil_kmd = silhouette_score(X, labels_kmd)
+ari_km  = adjusted_rand_score(y, labels_km)
+ari_kmd = adjusted_rand_score(y, labels_kmd)
+
+print("=" * 50)
+print(f"{'Metric':<30} {'KMeans':>8} {'KMedoids':>10}")
+print("=" * 50)
+print(f"{'Silhouette Score':<30} {sil_km:>8.4f} {sil_kmd:>10.4f}")
+print(f"{'Adjusted Rand Index':<30} {ari_km:>8.4f} {ari_kmd:>10.4f}")
+print("=" * 50)
+
+# ── PCA for 2-D projection ─────────────────────────────────────────────────────
+pca = PCA(n_components=2)
+X_pca = pca.fit_transform(X)
+
+centers_km_pca  = pca.transform(kmeans.cluster_centers_)
+centers_kmd_pca = pca.transform(kmedoids.cluster_centers_)
+
+# ── Figure layout: 2 rows × 3 cols ────────────────────────────────────────────
+fig = plt.figure(figsize=(16, 10))
+fig.suptitle("KMeans vs KMedoids — Iris Dataset", fontsize=16, fontweight="bold", y=0.98)
+
+cmap = "viridis"
+s    = 60
+edge = dict(linewidths=0.5, edgecolors="white")
+
+# Helper to add a labelled border box
+def add_label(ax, text, color):
+    ax.text(0.02, 0.97, text, transform=ax.transAxes,
+            fontsize=9, fontweight="bold", va="top",
+            bbox=dict(boxstyle="round,pad=0.3", facecolor=color, alpha=0.25))
+
+# ── Plot 1 – KMeans (Sepal features) ──────────────────────────────────────────
+ax1 = fig.add_subplot(2, 3, 1)
+sc = ax1.scatter(X[:, 0], X[:, 1], c=labels_km, s=s, cmap=cmap, **edge)
+ax1.scatter(kmeans.cluster_centers_[:, 0], kmeans.cluster_centers_[:, 1],
+            c="red", s=220, marker="X", zorder=5, label="Centroids", edgecolors="black")
+ax1.set_title("KMeans – Sepal Features")
+ax1.set_xlabel("Sepal Length (cm)")
+ax1.set_ylabel("Sepal Width (cm)")
+ax1.legend(fontsize=8)
+add_label(ax1, "KMeans", "#1f77b4")
+
+# ── Plot 2 – KMedoids (Sepal features) ────────────────────────────────────────
+ax2 = fig.add_subplot(2, 3, 2)
+ax2.scatter(X[:, 0], X[:, 1], c=labels_kmd, s=s, cmap=cmap, **edge)
+ax2.scatter(kmedoids.cluster_centers_[:, 0], kmedoids.cluster_centers_[:, 1],
+            c="red", s=220, marker="D", zorder=5, label="Medoids", edgecolors="black")
+ax2.set_title("KMedoids – Sepal Features")
+ax2.set_xlabel("Sepal Length (cm)")
+ax2.set_ylabel("Sepal Width (cm)")
+ax2.legend(fontsize=8)
+add_label(ax2, "KMedoids", "#ff7f0e")
+
+# ── Plot 3 – Ground truth ──────────────────────────────────────────────────────
+ax3 = fig.add_subplot(2, 3, 3)
+colors_gt = ["#4CAF50", "#2196F3", "#FF9800"]
+for i, name in enumerate(target_names):
+    mask = y == i
+    ax3.scatter(X[mask, 0], X[mask, 1], s=s, label=name,
+                color=colors_gt[i], edgecolors="white", linewidths=0.5)
+ax3.set_title("Ground Truth (Species)")
+ax3.set_xlabel("Sepal Length (cm)")
+ax3.set_ylabel("Sepal Width (cm)")
+ax3.legend(fontsize=8)
+add_label(ax3, "True Labels", "#9c27b0")
+
+# ── Plot 4 – KMeans PCA projection ────────────────────────────────────────────
+ax4 = fig.add_subplot(2, 3, 4)
+ax4.scatter(X_pca[:, 0], X_pca[:, 1], c=labels_km, s=s, cmap=cmap, **edge)
+ax4.scatter(centers_km_pca[:, 0], centers_km_pca[:, 1],
+            c="red", s=220, marker="X", zorder=5, label="Centroids", edgecolors="black")
+ax4.set_title("KMeans – PCA Projection")
+ax4.set_xlabel(f"PC1 ({pca.explained_variance_ratio_[0]*100:.1f}% var)")
+ax4.set_ylabel(f"PC2 ({pca.explained_variance_ratio_[1]*100:.1f}% var)")
+ax4.legend(fontsize=8)
+add_label(ax4, "KMeans", "#1f77b4")
+
+# ── Plot 5 – KMedoids PCA projection ──────────────────────────────────────────
+ax5 = fig.add_subplot(2, 3, 5)
+ax5.scatter(X_pca[:, 0], X_pca[:, 1], c=labels_kmd, s=s, cmap=cmap, **edge)
+ax5.scatter(centers_kmd_pca[:, 0], centers_kmd_pca[:, 1],
+            c="red", s=220, marker="D", zorder=5, label="Medoids", edgecolors="black")
+ax5.set_title("KMedoids – PCA Projection")
+ax5.set_xlabel(f"PC1 ({pca.explained_variance_ratio_[0]*100:.1f}% var)")
+ax5.set_ylabel(f"PC2 ({pca.explained_variance_ratio_[1]*100:.1f}% var)")
+ax5.legend(fontsize=8)
+add_label(ax5, "KMedoids", "#ff7f0e")
+
+# ── Plot 6 – Metrics bar chart ─────────────────────────────────────────────────
+ax6 = fig.add_subplot(2, 3, 6)
+metrics      = ["Silhouette\nScore", "Adjusted\nRand Index"]
+vals_km      = [sil_km,  ari_km]
+vals_kmd     = [sil_kmd, ari_kmd]
+x            = np.arange(len(metrics))
+width        = 0.32
+
+bars1 = ax6.bar(x - width/2, vals_km,  width, label="KMeans",   color="#1f77b4", alpha=0.85)
+bars2 = ax6.bar(x + width/2, vals_kmd, width, label="KMedoids", color="#ff7f0e", alpha=0.85)
+
+for bar in list(bars1) + list(bars2):
+    ax6.text(bar.get_x() + bar.get_width()/2, bar.get_height() + 0.01,
+             f"{bar.get_height():.3f}", ha="center", va="bottom", fontsize=8)
+
+ax6.set_xticks(x)
+ax6.set_xticklabels(metrics, fontsize=9)
+ax6.set_ylim(0, 1.15)
+ax6.set_title("Performance Metrics")
+ax6.legend(fontsize=8)
+ax6.set_ylabel("Score")
+ax6.axhline(0, color="gray", linewidth=0.5)
+
+plt.tight_layout(rect=[0, 0, 1, 0.97])
+plt.savefig("/mnt/user-data/outputs/clustering_comparison.png", dpi=150, bbox_inches="tight")
+plt.close()
+print("Figure saved.")
